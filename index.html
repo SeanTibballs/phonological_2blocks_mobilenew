@@ -4,6 +4,17 @@
   <meta charset="UTF-8" />
   <title>Phonological Similarity & Eye Condition – 2 Blocks</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- EmailJS SDK (for sending email from the browser) -->
+  <script type="text/javascript" src="https://cdn.emailjs.com/sdk/3.11.0/email.min.js"></script>
+  <script type="text/javascript">
+    (function() {
+      // TODO: REPLACE WITH YOUR REAL PUBLIC KEY FROM EMAILJS
+      // Example: emailjs.init('V3xxxxxxxABCDEFG');
+      emailjs.init('YOUR_PUBLIC_KEY_HERE');
+    })();
+  </script>
+
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -225,7 +236,8 @@
   <p class="small-note">
     IV1: phonological similarity (rhyming vs non-rhyming letters, both eyes open only)<br>
     IV2: eye condition (both eyes open, right eye closed, left eye closed)<br>
-    DV: number of recall errors.
+    DV: number of recall errors.<br><br>
+    Note: After you complete both blocks, your responses will be emailed to the researcher at <strong>tibballs01@gmail.com</strong>.
   </p>
 
   <!-- STEP 1: SETUP -->
@@ -267,7 +279,7 @@
 
     <p class="status" id="blockStatus">No block running yet.</p>
 
-    <!-- Letter grid (shown only when no block is running) -->
+    <!-- Letter grid (for experimenter only) -->
     <div class="worksheet-grid" id="worksheetGridContainer">
       <h3>Letter rows (for the experimenter only)</h3>
       <div id="worksheetGrid"></div>
@@ -276,7 +288,7 @@
       </p>
     </div>
 
-    <!-- Trial area (only visible during trials) -->
+    <!-- Trial area -->
     <div id="trialArea">
       <div id="sequenceContainer" style="display:none;">
         <div class="sequence-display" id="sequenceDisplay"></div>
@@ -320,16 +332,16 @@
   <script>
     // ====== CONFIG: LETTER SEQUENCES FROM WORKSHEET ======
     var sequences = [
-      ["H","S","F","Q","B","C","D","P"], // 1
-      ["G","D","B","T","Z","H","R","S"], // 2
-      ["Q","M","Z","R","C","P","D","G"], // 3
-      ["T","P","C","B","F","M","Q","Z"], // 4
-      ["F","R","Z","S","B","P","G","T"], // 5
-      ["C","G","B","P","M","Q","H","R"], // 6
-      ["H","Q","R","M","C","T","D","B"], // 7
-      ["D","P","T","C","R","Z","F","H"], // 8
-      ["M","R","H","Z","C","G","B","T"], // 9
-      ["B","T","G","P","R","F","M","S"]  // 10
+      ["H","S","F","Q","B","C","D","P"],
+      ["G","D","B","T","Z","H","R","S"],
+      ["Q","M","Z","R","C","P","D","G"],
+      ["T","P","C","B","F","M","Q","Z"],
+      ["F","R","Z","S","B","P","G","T"],
+      ["C","G","B","P","M","Q","H","R"],
+      ["H","Q","R","M","C","T","D","B"],
+      ["D","P","T","C","R","Z","F","H"],
+      ["M","R","H","Z","C","G","B","T"],
+      ["B","T","G","P","R","F","M","S"]
     ];
 
     var rhymingLetters    = ["B", "C", "D", "G", "P", "T"];
@@ -340,6 +352,7 @@
     var exposureMs = 5000;
     var trials = [];
     var showingTimeout = null;
+    var emailSent = false; // avoid double-sending
 
     // ====== DOM ELEMENTS ======
     var step1 = document.getElementById("step1");
@@ -404,7 +417,6 @@
       return "Block 2 (Alternating eyes)";
     }
 
-    // ====== BUILD STATIC ELEMENTS ======
     function buildResponseGrid() {
       responseGrid.innerHTML = "";
       for (var i = 0; i < 8; i++) {
@@ -453,10 +465,8 @@
         return;
       }
       exposureMs = exp * 1000;
-      // Switch sections
       step1.style.display = "none";
       step2.style.display = "block";
-      // Scroll up a little so Step 2 is visible
       window.scrollTo(0, 0);
     });
 
@@ -472,12 +482,6 @@
         currentIndex: 0
       };
 
-      worksheetGridContainer.style.display = "block";
-      worksheetGridContainer.style.display = "block"; // just in case
-      worksheetGridContainer.style.display = "block";
-      worksheetGridContainer.style.display = "block";
-
-      // actually hide it
       worksheetGridContainer.style.display = "none";
 
       setBlockStatus(getBlockName(blockType) + ": Trial 1 of " + sequences.length + ".");
@@ -504,6 +508,12 @@
         updateAllSummaries();
         updateTrialTable();
 
+        // Email once both blocks (2 × 10 trials) are likely completed
+        if (!emailSent && trials.length >= sequences.length * 2) {
+          sendResultsEmail();
+          emailSent = true;
+        }
+
         if (trials.length > 0) {
           step3.style.display = "block";
         }
@@ -521,7 +531,6 @@
       var seq = sequences[idx];
       sequenceDisplay.textContent = seq.join(" ");
 
-      // Eye instruction for this trial
       var rowNumber = idx + 1;
       var eyeInstructionText = "";
       if (currentBlock.blockType === "both_open_block") {
@@ -632,28 +641,26 @@
       clearTimer();
       currentBlock = null;
       trials = [];
+      emailSent = false;
       participantInput.value = "";
       resetTrialUI();
       setBlockStatus("No block running yet.");
       iv1SummaryContainer.innerHTML = "";
       summaryContainer.innerHTML = "";
       trialTableContainer.innerHTML = "";
-
       worksheetGridContainer.style.display = "block";
-
       step1.style.display = "block";
       step2.style.display = "none";
       step3.style.display = "none";
       window.scrollTo(0, 0);
     }
 
-    // ====== SUMMARIES ======
+    // ====== SUMMARIES (for on-screen display) ======
     function updateAllSummaries() {
       updateIV1Summary();
       updateIV2Summary();
     }
 
-    // IV1: main effect of phonological similarity – ONLY both eyes open
     function updateIV1Summary() {
       var bothOpenTrials = [];
       for (var i = 0; i < trials.length; i++) {
@@ -690,7 +697,6 @@
       iv1SummaryContainer.innerHTML = html;
     }
 
-    // IV2: eye condition × phonological similarity – all blocks
     function updateIV2Summary() {
       if (trials.length === 0) {
         summaryContainer.innerHTML =
@@ -735,7 +741,117 @@
       summaryContainer.innerHTML = html;
     }
 
-    // Trial table
+    // ====== BUILD CSV FROM TRIALS (TRIALS + IV1 + IV2) ======
+    function buildCsvFromTrials() {
+      var header = [
+        "participant",
+        "rowIndex",
+        "blockType",
+        "eyeConditionCode",
+        "eyeConditionLabel",
+        "sequence",
+        "response",
+        "totalErrors",
+        "rhymingErrors",
+        "nonRhymingErrors"
+      ];
+      var rows = [header.join(",")];
+
+      // Trial-level data
+      for (var i = 0; i < trials.length; i++) {
+        var t = trials[i];
+        var row = [
+          t.participant,
+          t.rowIndex,
+          t.blockType,
+          t.eyeCondition,
+          "\"" + t.eyeConditionLabel + "\"",
+          "\"" + t.sequence + "\"",
+          "\"" + t.response + "\"",
+          t.totalErrors,
+          t.rhymingErrors,
+          t.nonRhymingErrors
+        ];
+        rows.push(row.join(","));
+      }
+
+      // ---- IV1 SUMMARY (both eyes open only) ----
+      var bothOpenTrials = [];
+      for (i = 0; i < trials.length; i++) {
+        if (trials[i].eyeCondition === "both_open") {
+          bothOpenTrials.push(trials[i]);
+        }
+      }
+
+      var iv1Rhyming = 0;
+      var iv1NonRhyming = 0;
+      for (i = 0; i < bothOpenTrials.length; i++) {
+        iv1Rhyming    += bothOpenTrials[i].rhymingErrors;
+        iv1NonRhyming += bothOpenTrials[i].nonRhymingErrors;
+      }
+
+      rows.push(""); // blank line
+      rows.push("IV1 summary (both eyes open only)");
+      rows.push("measure,rhyming_errors,non_rhyming_errors");
+      rows.push("phonological_similarity," + iv1Rhyming + "," + iv1NonRhyming);
+
+      // ---- IV2 SUMMARY (eye condition × phonological similarity) ----
+      var summary = {
+        both_open:   { rhymingErrors: 0, nonRhymingErrors: 0 },
+        right_closed:{ rhymingErrors: 0, nonRhymingErrors: 0 },
+        left_closed: { rhymingErrors: 0, nonRhymingErrors: 0 }
+      };
+
+      for (i = 0; i < trials.length; i++) {
+        var tt = trials[i];
+        summary[tt.eyeCondition].rhymingErrors    += tt.rhymingErrors;
+        summary[tt.eyeCondition].nonRhymingErrors += tt.nonRhymingErrors;
+      }
+
+      rows.push("");
+      rows.push("IV2 summary (eye condition x phonological similarity)");
+      rows.push("eye_condition,rhyming_errors,non_rhyming_errors,total_errors");
+
+      function condRow(label, obj) {
+        var total = obj.rhymingErrors + obj.nonRhymingErrors;
+        rows.push(label + "," + obj.rhymingErrors + "," + obj.nonRhymingErrors + "," + total);
+      }
+
+      condRow("both_open", summary.both_open);
+      condRow("right_closed", summary.right_closed);
+      condRow("left_closed", summary.left_closed);
+
+      return rows.join("\n");
+    }
+
+    // ====== EMAIL SENDING (via EmailJS) ======
+    function sendResultsEmail() {
+      var csv = buildCsvFromTrials();
+      var participantId = participantInput.value || "(unknown)";
+
+      // These parameter names must match your EmailJS template variables:
+      // {{participant_id}}, {{trial_count}}, {{csv_data}}
+      var params = {
+        participant_id: participantId,
+        trial_count: trials.length,
+        csv_data: csv
+      };
+
+      // TODO: REPLACE WITH YOUR REAL SERVICE ID AND TEMPLATE ID FROM EMAILJS
+      var serviceId  = "YOUR_SERVICE_ID_HERE";
+      var templateId = "YOUR_TEMPLATE_ID_HERE";
+
+      emailjs.send(serviceId, templateId, params)
+        .then(function(response) {
+          console.log("EmailJS SUCCESS", response.status, response.text);
+          alert("Results emailed to tibballs01@gmail.com.");
+        }, function(error) {
+          console.error("EmailJS FAILED", error);
+          alert("Tried to email results but something went wrong. You can still download the CSV.");
+        });
+    }
+
+    // ====== TRIAL TABLE (for on-screen display) ======
     function updateTrialTable() {
       if (trials.length === 0) {
         trialTableContainer.innerHTML =
@@ -778,46 +894,14 @@
       trialTableContainer.innerHTML = html;
     }
 
-    // ====== CSV EXPORT ======
+    // ====== CSV DOWNLOAD BUTTON ======
     function downloadCsv() {
       if (trials.length === 0) {
         alert("No data to download yet.");
         return;
       }
 
-      var header = [
-        "participant",
-        "rowIndex",
-        "blockType",
-        "eyeConditionCode",
-        "eyeConditionLabel",
-        "sequence",
-        "response",
-        "totalErrors",
-        "rhymingErrors",
-        "nonRhymingErrors"
-      ];
-
-      var rows = [header.join(",")];
-
-      for (var i = 0; i < trials.length; i++) {
-        var t = trials[i];
-        var row = [
-          t.participant,
-          t.rowIndex,
-          t.blockType,
-          t.eyeCondition,
-          "\"" + t.eyeConditionLabel + "\"",
-          "\"" + t.sequence + "\"",
-          "\"" + t.response + "\"",
-          t.totalErrors,
-          t.rhymingErrors,
-          t.nonRhymingErrors
-        ];
-        rows.push(row.join(","));
-      }
-
-      var csv = rows.join("\n");
+      var csv = buildCsvFromTrials();
       var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
